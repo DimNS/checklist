@@ -1,0 +1,91 @@
+name: build
+
+on:
+  push:
+    tags:
+      - "v[0-9]*.[0-9]*.[0-9]*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build (e.g., v1.0.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Fetch tags
+        run: git fetch --force --tags
+
+      - name: Display tag
+        run: echo ${{ inputs.tag || github.ref_name }}
+
+      - name: Run Trivy vulnerability scanner for code
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          trivy-config: trivy.yaml
+        continue-on-error: true
+
+      - name: Run OWASP/cve-lite-cli for code
+        uses: OWASP/cve-lite-cli@v1
+        continue-on-error: true
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --ignore-scripts
+
+      - name: Run audit
+        run: bun audit
+        continue-on-error: true
+
+      - name: Run lint
+        run: bun run lint
+
+      - name: Run typecheck
+        run: bun run typecheck
+
+      - name: Run test
+        run: bun run test
+
+      - name: Build
+        env:
+          APP_VERSION: ${{ inputs.tag || github.ref_name }}
+        run: bun run build
+
+      - name: Deploy to GitHub Pages (gh-pages branch)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          publish_branch: gh-pages
+
+      - name: Generate Changelog
+        id: changelog
+        uses: requarks/changelog-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ inputs.tag || github.ref_name }}
+          writeToFile: false
+          excludeTypes: ""
+          includeInvalidCommits: true
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ inputs.tag || github.ref_name }}
+          name: Release ${{ inputs.tag || github.ref_name }}
+          body: ${{ steps.changelog.outputs.changes }}
+          token: ${{ secrets.GITHUB_TOKEN }}
