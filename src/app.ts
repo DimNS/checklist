@@ -284,7 +284,10 @@ export class App {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
-    const link = el("a", { href: url, download: "checklists.json" });
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    const link = el("a", { href: url, download: `checklists_${stamp}.json` });
 
     document.body.append(link);
     link.click();
