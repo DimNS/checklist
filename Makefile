@@ -1,4 +1,4 @@
-.PHONY: install ai-check typecheck lint test dev build release
+.PHONY: install ai-check typecheck format lint test dev build release
 
 install:
 	@bun install
@@ -10,7 +10,10 @@ ai-check: typecheck lint test
 typecheck:
 	@bun run typecheck
 
-lint:
+format:
+	@bun run format
+
+lint: format
 	@bun run lint
 
 test:
